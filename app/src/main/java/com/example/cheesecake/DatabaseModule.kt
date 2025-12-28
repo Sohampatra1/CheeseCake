@@ -20,11 +20,18 @@ object DatabaseModule {
             context,
             AppDatabase::class.java,
             "water_reminder.db"
-        ).build()
+        )
+        .fallbackToDestructiveMigration()
+        .build()
     }
 
     @Provides
     fun provideWaterIntakeDao(appDatabase: AppDatabase): WaterIntakeDao {
         return appDatabase.waterIntakeDao()
+    }
+
+    @Provides
+    fun providePeriodDao(appDatabase: AppDatabase): PeriodDao {
+        return appDatabase.periodDao()
     }
 }

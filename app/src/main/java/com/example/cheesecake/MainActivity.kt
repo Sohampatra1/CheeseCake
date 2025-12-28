@@ -44,6 +44,8 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
@@ -79,7 +81,7 @@ class MainActivity : ComponentActivity() {
                         startDestination = "main",
                         modifier = Modifier.padding(innerPadding)
                     ) {
-                        composable("main") { MainScreen(navController = navController) }
+                        composable("main") { MainRootScreen(navController = navController) }
                         composable(
                             "camera?beep={beep}",
                             arguments = listOf(androidx.navigation.navArgument("beep") { defaultValue = false })
@@ -96,182 +98,33 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun MainScreen(
-    navController: NavController, 
-    viewModel: MainViewModel = hiltViewModel()
-) {
-    val records by viewModel.waterIntakeRecords.collectAsState(initial = emptyList())
-    val context = LocalContext.current
+fun MainRootScreen(navController: NavController) {
+    var selectedTab by remember { mutableStateOf(0) }
     
-    // Persistence for Reminder Toggle
-    val sharedPref = remember { context.getSharedPreferences("cheesecake_prefs", android.content.Context.MODE_PRIVATE) }
-    var isReminderEnabled by remember { 
-        mutableStateOf(sharedPref.getBoolean("reminder_enabled", false)) 
-    }
-
-    // Ensure worker is scheduled if enabled (idempotent)
-    LaunchedEffect(Unit) {
-        if (isReminderEnabled) {
-            NotificationManager.scheduleReminder(context)
-        }
-    }
-
-    // Check for Alarm Trigger from Notification
-    val activity = context as? android.app.Activity
-    val intent = activity?.intent
-    val triggerAlarm = intent?.getBooleanExtra("EXTRA_REMINDER_TRIGGER", false) ?: false
-    
-    LaunchedEffect(triggerAlarm) {
-        if (triggerAlarm) {
-            navController.navigate("camera?beep=true")
-            intent?.removeExtra("EXTRA_REMINDER_TRIGGER")
-        }
-    }
-    
-    // Calculate Today's intake
-    val todayCount = remember(records) {
-        val startOfDay = java.time.LocalDate.now().atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
-        records.count { it.timestamp >= startOfDay }
-    }
-
-    // Background
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(androidx.compose.ui.graphics.Color(0xFFF2F2F7)) // iOS System Gray 6
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(24.dp)
-        ) {
-            // Header
-            Text(
-                text = "Hydration",
-                style = androidx.compose.material3.MaterialTheme.typography.displaySmall.copy(
-                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                    color = androidx.compose.ui.graphics.Color.Black
-                ),
-                modifier = Modifier.align(Alignment.Start)
-            )
-
-            // Hero Card
-            androidx.compose.material3.Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(200.dp),
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
-                elevation = androidx.compose.material3.CardDefaults.cardElevation(defaultElevation = 8.dp),
-                colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = androidx.compose.ui.graphics.Color.White)
+    Scaffold(
+        bottomBar = {
+            NavigationBar(
+                containerColor = androidx.compose.ui.graphics.Color.White
             ) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = "$todayCount",
-                            style = androidx.compose.material3.MaterialTheme.typography.displayLarge.copy(
-                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                                color = androidx.compose.ui.graphics.Color(0xFF007AFF) // iOS Blue
-                            )
-                        )
-                        Text(
-                            text = "Cups Today",
-                            style = androidx.compose.material3.MaterialTheme.typography.titleMedium.copy(
-                                color = androidx.compose.ui.graphics.Color.Gray
-                            )
-                        )
-                    }
-                }
+                NavigationBarItem(
+                    selected = selectedTab == 0,
+                    onClick = { selectedTab = 0 },
+                    icon = { Text("💧") }, // Text is fine, but cleaner syntax
+                    label = { Text("Hydration") }
+                )
+                NavigationBarItem(
+                    selected = selectedTab == 1,
+                    onClick = { selectedTab = 1 },
+                    icon = { Text("🌸") },
+                    label = { Text("Cycles") }
+                )
             }
-
-            // Quick Actions
-            androidx.compose.foundation.layout.Row(
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                // Verify Button (Primary)
-                androidx.compose.material3.Button(
-                    onClick = { navController.navigate("camera") },
-                    modifier = Modifier.weight(1f).height(56.dp),
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
-                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                        containerColor = androidx.compose.ui.graphics.Color(0xFF007AFF)
-                    )
-                ) {
-                    Text("Verify Drink")
-                }
-
-                // Manual Button (Secondary)
-                androidx.compose.material3.Button(
-                    onClick = { viewModel.saveWaterIntakeRecord() },
-                    modifier = Modifier.weight(1f).height(56.dp),
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
-                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                        containerColor = androidx.compose.ui.graphics.Color.White,
-                        contentColor = androidx.compose.ui.graphics.Color(0xFF007AFF)
-                    )
-                ) {
-                    Text("Manual Log")
-                }
-            }
-            
-            // Settings / Extras Section
-            androidx.compose.material3.Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
-                colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = androidx.compose.ui.graphics.Color.White)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    // History
-                     androidx.compose.foundation.layout.Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { navController.navigate("calendar") }
-                            .padding(vertical = 12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("View History", style = androidx.compose.material3.MaterialTheme.typography.bodyLarge)
-                        androidx.compose.material3.Icon(
-                            imageVector = androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowForward,
-                            contentDescription = "Go",
-                            tint = androidx.compose.ui.graphics.Color.Gray
-                        )
-                    }
-                    
-                    androidx.compose.material3.HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                    
-                    // Reminders
-                    androidx.compose.foundation.layout.Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text("Daily Reminders", style = androidx.compose.material3.MaterialTheme.typography.bodyLarge)
-                            Text("Every 30 minutes", style = androidx.compose.material3.MaterialTheme.typography.bodySmall, color = androidx.compose.ui.graphics.Color.Gray)
-                        }
-                        androidx.compose.material3.Switch(
-                            checked = isReminderEnabled,
-                            onCheckedChange = { isEnabled ->
-                                isReminderEnabled = isEnabled
-                                sharedPref.edit().putBoolean("reminder_enabled", isEnabled).apply()
-                                if (isEnabled) {
-                                    NotificationManager.scheduleReminder(context)
-                                } else {
-                                    NotificationManager.cancelReminder(context)
-                                }
-                            },
-                            colors = androidx.compose.material3.SwitchDefaults.colors(
-                                checkedThumbColor = androidx.compose.ui.graphics.Color.White,
-                                checkedTrackColor = androidx.compose.ui.graphics.Color(0xFF34C759) // iOS Green
-                            )
-                        )
-                    }
-                }
+        }
+    ) { innerPadding ->
+        Box(modifier = Modifier.padding(innerPadding)) {
+            when (selectedTab) {
+                0 -> WaterTrackerScreen(navController = navController)
+                1 -> PeriodTrackerScreen()
             }
         }
     }
@@ -620,6 +473,6 @@ fun CameraPreview(
 @Composable
 fun DefaultPreview() {
     CheeseCakeTheme {
-        MainScreen(navController = rememberNavController())
+        MainRootScreen(navController = rememberNavController())
     }
 }

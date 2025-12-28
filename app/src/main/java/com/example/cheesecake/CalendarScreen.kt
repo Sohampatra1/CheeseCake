@@ -1,6 +1,8 @@
 package com.example.cheesecake
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -34,9 +36,11 @@ import java.util.Locale
 @Composable
 fun CalendarScreen(
     navController: NavController,
-    viewModel: MainViewModel = hiltViewModel()
+    viewModel: MainViewModel = hiltViewModel(),
+    periodViewModel: PeriodViewModel = hiltViewModel()
 ) {
     val records by viewModel.waterIntakeRecords.collectAsState(initial = emptyList())
+    val periodRecords by periodViewModel.periodRecords.collectAsState()
     val currentMonth = remember { mutableStateOf(YearMonth.now()) }
     val selectedDate = remember { mutableStateOf(LocalDate.now()) }
 
@@ -46,6 +50,24 @@ fun CalendarScreen(
             Instant.ofEpochMilli(it.timestamp)
                 .atZone(ZoneId.systemDefault())
                 .toLocalDate()
+        }
+    }
+    
+    // Period Data
+    val periodDates = remember(periodRecords) {
+        periodRecords.map { 
+            Instant.ofEpochMilli(it.timestamp)
+                .atZone(ZoneId.systemDefault())
+                .toLocalDate() 
+        }.toSet()
+    }
+    
+    val predictedDate = remember(periodRecords) {
+        periodRecords.maxByOrNull { it.timestamp }?.let { last ->
+            Instant.ofEpochMilli(last.timestamp)
+                .atZone(ZoneId.systemDefault())
+                .toLocalDate()
+                .plusDays(28)
         }
     }
 
@@ -64,7 +86,7 @@ fun CalendarScreen(
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
             }
             Text(
-                "Hydration History",
+                "Calendar",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold
             )
@@ -99,9 +121,7 @@ fun CalendarScreen(
 
         // Calendar Grid
         val daysInMonth = currentMonth.value.lengthOfMonth()
-        val firstDayOfMonth = currentMonth.value.atDay(1).dayOfWeek.value % 7 // Sun=0, Sat=6 handling
-        // Note: java.time DayOfWeek is Mon=1 ... Sun=7. We want Sun=0 for standard grid.
-        // If Mon=1, Sun=7.  %7 -> Mon=1, Sun=0. Correct.
+        val firstDayOfMonth = currentMonth.value.atDay(1).dayOfWeek.value % 7 
 
         LazyVerticalGrid(
             columns = GridCells.Fixed(7),
@@ -116,8 +136,11 @@ fun CalendarScreen(
                 val day = dayIndex + 1
                 val date = currentMonth.value.atDay(day)
                 val isSelected = date == selectedDate.value
-                val hasHydration = recordsByDate.containsKey(date)
                 val isToday = date == LocalDate.now()
+                
+                val hasHydration = recordsByDate.containsKey(date)
+                val isPeriodStart = periodDates.contains(date)
+                val isPredicted = date == predictedDate
 
                 Box(
                     modifier = Modifier
@@ -136,13 +159,36 @@ fun CalendarScreen(
                             color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface,
                             fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal
                         )
-                        if (hasHydration && !isSelected) {
-                            Box(
-                                modifier = Modifier
-                                    .size(4.dp)
-                                    .background(Color.Blue, CircleShape)
-                            )
+                        
+                        // Dots Row
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(2.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            if (hasHydration && !isSelected) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(4.dp)
+                                        .background(Color.Blue, CircleShape)
+                                )
+                            }
+                            if (isPeriodStart && !isSelected) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(4.dp)
+                                        .background(Color.Red, CircleShape)
+                                )
+                            }
                         }
+                    }
+                    
+                    // Predicted Ring (Overlay)
+                    if (isPredicted && !isSelected) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .border(1.dp, Color.Red.copy(alpha = 0.5f), CircleShape)
+                        )
                     }
                 }
             }
@@ -158,15 +204,64 @@ fun CalendarScreen(
         )
 
         val dayRecords = recordsByDate[selectedDate.value] ?: emptyList()
+        val isPeriodDay = periodDates.contains(selectedDate.value)
+        val isPredictedDay = selectedDate.value == predictedDate
 
-        if (dayRecords.isEmpty()) {
+        if (dayRecords.isEmpty() && !isPeriodDay && !isPredictedDay) {
             Text(
-                "No hydration records for this day.",
+                "No records for this day.",
                 color = Color.Gray,
                 style = MaterialTheme.typography.bodyMedium
             )
         } else {
             LazyColumn {
+                if (isPeriodDay) {
+                    item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFB6C1).copy(alpha = 0.3f))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier.size(12.dp).background(Color.Red, CircleShape)
+                                )
+                                Spacer(modifier = Modifier.width(16.dp))
+                                Text(
+                                    text = "Period Started",
+                                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold)
+                                )
+                            }
+                        }
+                    }
+                }
+                
+                if (isPredictedDay) {
+                     item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            border = BorderStroke(1.dp, Color.Red.copy(alpha=0.5f))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier.size(12.dp).border(2.dp, Color.Red, CircleShape)
+                                )
+                                Spacer(modifier = Modifier.width(16.dp))
+                                Text(
+                                    text = "Predicted Period Start",
+                                    style = MaterialTheme.typography.bodyLarge.copy(color = Color.Gray)
+                                )
+                            }
+                        }
+                    }
+                }
+
                 items(dayRecords) { record ->
                     Card(
                         modifier = Modifier
@@ -180,7 +275,7 @@ fun CalendarScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
-                                imageVector = androidx.compose.material.icons.Icons.Default.WaterDrop, // Assuming available or generic
+                                imageVector = androidx.compose.material.icons.Icons.Default.WaterDrop,
                                 contentDescription = "Water",
                                 tint = Color.Blue
                             )
