@@ -81,7 +81,12 @@ class MainActivity : ComponentActivity() {
                         startDestination = "main",
                         modifier = Modifier.padding(innerPadding)
                     ) {
-                        composable("main") { MainRootScreen(navController = navController) }
+                        composable("main") { 
+                                val openTab = intent.getIntExtra("EXTRA_OPEN_TAB", 0)
+                                // Clear the extra so rotation doesn't reset it, though onCreate is better place. 
+                                // Actually, intent is on Activity. 
+                                MainRootScreen(navController = navController, initialTab = openTab) 
+                        }
                         composable(
                             "camera?beep={beep}",
                             arguments = listOf(androidx.navigation.navArgument("beep") { defaultValue = false })
@@ -94,12 +99,15 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        
+        // Schedule Background Jobs
+        NotificationManager.schedulePeriodCheck(this)
     }
 }
 
 @Composable
-fun MainRootScreen(navController: NavController) {
-    var selectedTab by remember { mutableStateOf(0) }
+fun MainRootScreen(navController: NavController, initialTab: Int = 0) {
+    var selectedTab by remember { mutableStateOf(initialTab) }
     
     Scaffold(
         bottomBar = {
