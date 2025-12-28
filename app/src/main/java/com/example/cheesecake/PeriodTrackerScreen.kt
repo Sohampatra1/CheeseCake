@@ -15,8 +15,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 
+import androidx.compose.foundation.clickable
+import androidx.navigation.NavController
+
 @Composable
 fun PeriodTrackerScreen(
+    navController: NavController? = null,
     viewModel: PeriodViewModel = hiltViewModel()
 ) {
     val records by viewModel.periodRecords.collectAsState()
@@ -123,7 +127,7 @@ fun PeriodTrackerScreen(
                 )
             }
             
-            // Info Card
+    // Info Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
@@ -138,6 +142,34 @@ fun PeriodTrackerScreen(
                         text = "Based on a 28-day cycle. Predictions will improve as you log more data.",
                         style = MaterialTheme.typography.bodyMedium.copy(color = Color.Gray)
                     )
+                }
+            }
+
+            // History Link
+            if (navController != null) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { navController.navigate("calendar") }
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "View History",
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        Icon(
+                            imageVector = androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowForward,
+                            contentDescription = "Go",
+                            tint = Color.Gray
+                        )
+                    }
                 }
             }
         }

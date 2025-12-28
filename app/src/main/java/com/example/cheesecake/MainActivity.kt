@@ -124,7 +124,7 @@ fun MainRootScreen(navController: NavController) {
         Box(modifier = Modifier.padding(innerPadding)) {
             when (selectedTab) {
                 0 -> WaterTrackerScreen(navController = navController)
-                1 -> PeriodTrackerScreen()
+                1 -> PeriodTrackerScreen(navController = navController)
             }
         }
     }
